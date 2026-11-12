@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SSA三角形個数判別マシン</title>
+<style>
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+
+:root{
+  --bg:#f4f6fa; --card:#fff; --line:#e5e9f0; --ink:#1e293b; --sub:#64748b;
+  --blue:#1d74d0; --purple:#8b3be0; --green:#0e9f6e; --orange:#c9731a; --red:#e11d48; --teal:#0f766e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Yu Gothic",Meiryo,sans-serif;line-height:1.5}
+header{padding:14px 16px 0;max-width:1100px;margin:0 auto}
+header h1{font-size:1.15rem;margin:0 0 10px;line-height:1.35}
+header h1 .sub{display:block;font-size:.85rem;font-weight:600;color:var(--sub);margin-top:2px}
+main{max-width:1100px;margin:0 auto;padding:0 12px 24px}
+.tabs{display:flex;gap:6px;margin:0 4px 12px}
+.tabs button{flex:1;max-width:260px;padding:10px 12px;border:1px solid var(--line);border-bottom:none;
+  background:#e9edf4;color:var(--sub);font:inherit;font-weight:700;border-radius:10px 10px 0 0;cursor:pointer}
+.tabs button.active{background:var(--card);color:var(--ink);box-shadow:0 -2px 0 var(--blue) inset}
+.panel[hidden]{display:none}
+.layout{display:grid;gap:12px;grid-template-columns:1fr;align-items:start}
+@media(max-width:899px){.canvas-card{position:sticky;top:0;z-index:5}}
+.rows{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+.card-head{display:flex;align-items:center;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.card-head h2{font-size:1rem;margin:0}
+.dot{width:10px;height:10px;border-radius:50%;background:#93b4f5;flex:none}
+.stage{position:relative}
+.stage svg{display:block;width:100%}
+.badge{position:absolute;right:4px;bottom:4px;padding:4px 8px;border-radius:9px;background:#fff;border:1.5px solid var(--sub);
+  font-weight:700;font-size:.665rem;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.badge b{font-size:1.05rem;margin:0 2px}
+.info{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;justify-content:space-between;
+  background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:.9rem}
+.info b{font-family:ui-monospace,Menlo,Consolas,monospace}
+.info .g{color:#047857}.info .red{color:var(--red)}
+.info .cond{font-size:.82rem;color:#334155;font-weight:600}
+.ctrl-head{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.ctrl-head .ctrl-title{border-bottom:none;margin-bottom:0;flex:none}
+.nonum{font-size:.82rem;font-weight:700;color:#334155;display:flex;align-items:center;gap:5px;cursor:pointer}
+.nonum input{width:16px;height:16px;accent-color:#2563eb}
+.ctrl-title{margin:0 0 6px;font-size:.8rem;color:var(--sub);letter-spacing:.05em;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.sel-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.sel-row label{font-size:.85rem;font-weight:700;display:flex;align-items:center;gap:6px}
+.sel-row select{font:inherit;padding:5px 8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff}
+.row{margin-bottom:4px}
+.row-top{display:flex;align-items:center;gap:6px;margin-bottom:0;flex-wrap:wrap}
+.row-top .lbl{flex:1;font-weight:700;font-size:.85rem;white-space:nowrap}
+.row-top .dot{background:var(--c)}
+.num{width:74px;text-align:right;font:700 1rem ui-monospace,Menlo,Consolas,monospace;color:var(--c);
+  border:1px solid #cbd5e1;border-radius:8px;padding:3px 6px;background:#fff}
+.num.ed{display:inline-block;width:auto;min-width:74px;max-width:100%;min-height:1.7em;line-height:1.35;white-space:nowrap;overflow-x:auto;overflow-y:hidden;outline:none;cursor:text}
+.num.ed:focus,.num:focus{border-color:var(--c);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+.ed .fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 3px;line-height:1.15}
+.ed .fr>.nu{border-bottom:2px solid currentColor}
+.ed .box{display:inline-block;min-width:.9em;padding:0 3px;text-align:center;border-radius:3px}
+.ed .box.empty{background:#8ec5f7;min-height:.95em}
+.ed .sq{display:inline-flex;align-items:stretch;margin:0 3px;vertical-align:middle}
+.ed .sq>.rad{border-top:2px solid currentColor;padding:0 2px 0 3px}
+.ed .sq>.rt{display:inline-block;width:11px;font-size:0;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M2,58 L16,50 L42,98 L100,3' fill='none' stroke='black' stroke-width='2.2' vector-effect='non-scaling-stroke' stroke-linejoin='round'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M2,58 L16,50 L42,98 L100,3' fill='none' stroke='black' stroke-width='2.2' vector-effect='non-scaling-stroke' stroke-linejoin='round'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}
+.rng{width:100%;accent-color:var(--c);height:24px;margin:0}
+.symbar{margin-top:8px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;color:#9a3412}
+.symbar[hidden]{display:none}
+.padhead{font-size:.85rem;font-weight:700;margin-bottom:6px}.padhead small{font-weight:400;color:#b45309}
+.pad{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;max-width:280px}
+.pk{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:62px;font-family:inherit;font-size:1.3rem;border:1px solid #fdba74;background:#fff;color:#7c2d12;border-radius:8px;cursor:pointer;touch-action:manipulation}
+.pk:active{background:#ffedd5}
+.pk small{font-size:.72rem;font-weight:600;color:#9a3412}
+.ico-fr{display:inline-flex;flex-direction:column;align-items:center;gap:2px}
+.ico-fr i{width:22px;height:9px;background:#5aa9f2;border-radius:2px}
+.ico-fr b{width:30px;height:2px;background:#1e3a8a}
+.ico-sq{display:inline-flex;align-items:flex-end;font-size:1.5rem;line-height:1;color:#1e3a8a}
+.ico-sq i{display:inline-block;width:18px;height:14px;background:#5aa9f2;border-top:2px solid #1e3a8a;margin-left:1px}
+.pk.fn{background:#fff1e6;font-size:.95rem}
+.pk.wide{grid-column:span 2;font-size:.95rem}
+.pk.ok{background:#2563eb;border-color:#2563eb;color:#fff}
+.hint{font-size:.78rem;color:var(--sub);margin:4px 0 0}
+svg text{font-family:inherit;font-weight:700}
+svg .halo{paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+@media(max-width:899px){.num{width:68px;font-size:.85rem;padding:3px 4px}.row-top .lbl{font-size:.78rem}.row-top{gap:4px}}
+@media(max-width:599px){.rows{grid-template-columns:1fr}.num{width:74px;font-size:1rem}.row-top .lbl{font-size:.85rem}}
+.lock{margin-left:2px}
+.pw{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.pw[hidden]{display:none}
+.pw-card{background:#fff;border-radius:14px;padding:18px 18px 14px;width:min(340px,100%);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.pw-title{font-weight:700;margin-bottom:10px}
+.pw-card input{width:100%;font:inherit;font-size:1.05rem;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px}
+.pw-card input:focus{outline:2px solid #93c5fd;border-color:#60a5fa}
+.pw-err{color:#dc2626;font-size:.85rem;margin-top:6px}
+.pw-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.pw-btns button{font:inherit;padding:7px 16px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;cursor:pointer}
+.pw-btns .pw-ok{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700}
+</style>
+</head>
+<body>
+<header><h1>SSA三角形個数判別マシン<span class="sub">～2辺と1つの角から三角形はいくつできる？～</span></h1></header>
+<noscript><div style="margin:12px;padding:12px;background:#fff7ed;border:1px solid #fdba74;border-radius:10px">このページは JavaScript を使います。JavaScript が無効、またはプレビュー画面（メール・LINE・「ファイル」アプリのクイックルックなど）では動作しません。Safari や Chrome などのブラウザで開いてください。</div></noscript>
+<div id="errBox" hidden style="margin:12px;padding:12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;color:#991b1b;font-size:.85rem"></div>
+<main>
+  <nav class="tabs">
+    <button data-tab="t1" class="active">① b, c, C を与える</button>
+    <button data-tab="t2">② 一般の SSA <span class="lock">🔒</span></button>
+  </nav>
+  <section id="t1" class="panel"></section>
+  <section id="t2" class="panel" hidden></section>
+</main>
+
+<div id="pw" class="pw" hidden>
+  <div class="pw-card">
+    <div class="pw-title">🔒 パスワードを入力してください</div>
+    <input id="pwIn" type="password" autocomplete="off" aria-label="パスワード">
+    <div id="pwErr" class="pw-err" hidden>パスワードが違います</div>
+    <div class="pw-btns"><button type="button" id="pwCancel">キャンセル</button><button type="button" id="pwOk" class="pw-ok">開く</button></div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('error',function(e){if(e.message&&e.message.indexOf('ResizeObserver')>=0){e.stopImmediatePropagation();return;}var b=document.getElementById('errBox');if(b){b.hidden=false;b.textContent='エラーが発生しました：'+(e.message||'')+'（'+(e.lineno||'?')+'行目）';}});
+(function(){
+'use strict';
+const ORD=['A','B','C'];
+const fmt=(x,d=3)=>{let s=x.toFixed(d);if(s.includes('.')){s=s.replace(/0+$/,'');if(s.endsWith('.'))s+='0';}return s;};
+/* 図中の表示用：a√n/d の形（例：√2，2√3，3√2/2）で表せる値は、小数でなく根号で表示する */
+const SQF=[2,3,5,6,7,10,11,13,14,15,17,19,21,22,23,26,29,30,31,33,34,35,37,38,39,41,42,43,46,47];
+function rootForm(x){
+  if(!(x>0)) return null;
+  for(let d=1;d<=6;d++)for(const n of SQF){const a=x*d/Math.sqrt(n),ra=Math.round(a);
+    if(ra>=1&&ra<=12&&Math.abs(a-ra)<1e-9) return {a:ra,n,d};}
+  return null;
+}
+/* 分数で入力された値は、既約分数 p/q で表示する */
+function ratFrac(v){
+  if(!(v>0)) return null;
+  for(let q=2;q<=200;q++){const p=Math.round(v*q);if(p>0&&Math.abs(p/q-v)<1e-9)return {p,q};}
+  return null;
+}
+const fracOk=(x,fr)=>fr&&Math.abs(x-fr.p/fr.q)<1e-9;
+/* 値の表示トークン：直接入力（ex=true）のときだけ √・分数で表示。スライダー操作中は小数 */
+const valT=(x,fr,ex)=>{
+  if(!ex) return [fmt(x)];
+  if(fracOk(x,fr)) return [`${fr.p}/${fr.q}`];
+  const f=rootForm(x); return f?[{root:f}]:[fmt(x)];
+};
+/* SVG 上の数式ラベル：根号は √ の記号と上線を線で描き、数を根号の中に入れる */
+const MCTX=document.createElement('canvas').getContext('2d');
+const MFONT=()=>getComputedStyle(document.body).fontFamily;
+function mathSvg(x,y,anchor,fs,fill,tokens,halo){
+  const wStr=(t,it)=>{MCTX.font=`${it?'italic ':''}700 ${fs}px ${MFONT()}`;return MCTX.measureText(t).width;};
+  const items=[];let W=0;
+  const addT=(t,it)=>{const w=wStr(t,it);items.push({k:'t',s:t,w,i:it});W+=w;};
+  for(const t of tokens){
+    if(typeof t==='string') addT(t,false);
+    else if(t.i!==undefined) addT(t.i,true);
+    else{const f=t.root;if(f.a>1)addT(String(f.a),false);
+      const rw=wStr(String(f.n)),tot=0.6*fs+rw+0.1*fs;items.push({k:'r',n:String(f.n),rw,w:tot});W+=tot;
+      if(f.d>1)addT('/'+f.d,false);}
+  }
+  let cx=anchor==='start'?x:(anchor==='end'?x-W:x-W/2),o='';
+  for(const it of items){
+    if(it.k==='t'){
+      o+=`<text${halo?' class="halo"':''} style="white-space:pre" x="${cx}" y="${y}" font-size="${fs}" fill="${fill}"${it.i?' font-style="italic"':''}>${it.s}</text>`;
+    }else{
+      const yb=y-0.92*fs, d=`M${cx+0.02*fs},${y-0.38*fs} L${cx+0.1*fs},${y-0.44*fs} L${cx+0.27*fs},${y+0.03*fs} L${cx+0.54*fs},${yb} L${cx+0.6*fs+it.rw+0.08*fs},${yb}`;
+      if(halo) o+=`<path d="${d}" fill="none" stroke="#fff" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      o+=`<path d="${d}" fill="none" stroke="${fill}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      o+=`<text${halo?' class="halo"':''} x="${cx+0.6*fs}" y="${y}" font-size="${fs}" fill="${fill}">${it.n}</text>`;
+    }
+    cx+=it.w;
+  }
+  return {g:o,w:W};
+}
+
+const C_S='#1d74d0', C_L='#8b3be0', C_G='#0e9f6e', C_R='#ec4899', C_T='#f08c00', C_BASE='#2563eb', C_H='#0f766e', C_N='#94a3b8';
+
+/* ---- 計算 : 角の頂点を原点、隣辺 r を角 θ の向きに、もう1つの辺は x 軸上 ---- */
+function solve(thDeg,r,t){
+  const th=thDeg*Math.PI/180, zx=r*Math.cos(th), zy=r*Math.sin(th), h=zy, tol=1e-6;
+  let xs=[];
+  if(t>=h-tol){
+    const d=Math.abs(t-h)<tol?0:Math.sqrt(t*t-h*h);
+    xs=d===0?[zx]:[zx-d,zx+d];
+  }
+  const roots=xs.map(x=>({x,valid:x>1e-6}));
+  const valid=roots.filter(o=>o.valid).map(o=>o.x);
+  return {th,zx,zy,h,roots,valid,n:valid.length};
+}
+
+/* 直接入力用：√2, 2√3, √3/2, √(2+1) など簡単な式を数値にする */
+function parseExpr(str){
+  const src=str.replace(/\s+/g,'').replace(/[×＊]/g,'*').replace(/[÷／]/g,'/').replace(/（/g,'(').replace(/）/g,')')
+    .replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[．。]/g,'.');
+  let i=0; const peek=()=>src[i];
+  function expr(){let v=term();while(peek()==='+'||peek()==='-'){const o=src[i++],t=term();v=o==='+'?v+t:v-t;}return v;}
+  function term(){let v=factor();for(;;){const c=peek();
+    if(c==='*'||c==='/'){i++;const f=factor();v=c==='*'?v*f:v/f;}
+    else if(c!==undefined&&/[0-9.√(]/.test(c)){v*=factor();}
+    else break;}return v;}
+  function factor(){const c=peek();
+    if(c==='-'){i++;return -factor();}
+    if(c==='+'){i++;return factor();}
+    if(c==='√'){i++;return Math.sqrt(factor());}
+    if(c==='('){i++;const v=expr();if(peek()!==')')throw 0;i++;return v;}
+    const m=/^(\d+\.?\d*|\.\d+)/.exec(src.slice(i));if(!m)throw 0;i+=m[0].length;return parseFloat(m[0]);}
+  try{const v=expr();return i===src.length&&isFinite(v)?v:NaN;}catch(e){return NaN;}
+}
+
+const DEFS={
+  theta:{min:1,max:179,step:1,numStep:0.1,color:'#ec4899'},
+  r:{min:0.5,max:10,step:0.1,numStep:0.1,color:'#ec4899'},
+  t:{min:0.1,max:30,step:'any',numStep:0.001,color:'#f08c00'}
+};
+
+function Panel(root,cfg){
+  const st={T:cfg.T,rl:cfg.rl,theta:cfg.theta,r:cfg.r,t:cfg.t,fr:{r:null,t:null},ex:{r:false,t:true},hideNum:false};
+  const rowHtml=k=>`<div class="row" data-k="${k}" style="--c:${DEFS[k].color}">
+      <div class="row-top"><span class="dot"></span><span class="lbl"></span>
+      ${k==='theta'
+        ? '<input class="num" type="text" inputmode="decimal" autocomplete="off">'
+        : '<div class="num ed" contenteditable="true" spellcheck="false" role="textbox" inputmode="decimal" data-sq="1"></div>'}</div>
+      <input class="rng" type="range" min="${DEFS[k].min}" max="${DEFS[k].max}" step="${DEFS[k].step}"></div>`;
+  root.innerHTML=`<div class="layout">
+    <div class="card canvas-card">
+      <div class="card-head"><span class="dot"></span><h2>SSA 探究キャンバス</h2></div>
+      <div class="stage"><svg></svg><div class="badge"></div></div>
+    </div>
+    <div class="card ctrl-card">
+      <div class="ctrl-head"><h3 class="ctrl-title">設定</h3><label class="nonum"><input type="checkbox" class="chkNum"> 数値を表示しない</label></div>
+      ${cfg.general?`<div class="sel-row">
+        <label>角 θ の頂点 <select class="selT"><option value="">未設定</option>${ORD.map(x=>`<option>${x}</option>`).join('')}</select></label>
+        <label>隣辺 r <select class="selR"></select></label></div>`:''}
+      <div class="rows">${rowHtml('theta')}${rowHtml('r')}${rowHtml('t')}</div>
+      <div class="symbar" hidden>
+        <div class="padhead">直接入力中　<small>分数・ルートの箱に数を入れてください</small></div>
+        <div class="pad"></div>
+      </div>
+      <p class="hint">辺の大きさは、直接入力することができます。その際、√や分数で指定することもできます。入力後は、√や分数で入力した値はそのままの形で、それ以外は小数で表示されます（小数第4位を四捨五入して、小数第3位まで表示）。スライダーを動かしている間は、すべて小数で表示します。</p>
+    </div></div>`;
+  const $=s=>root.querySelector(s);
+  const svg=$('svg'), stage=$('.stage'), badge=$('.badge');
+  const rows={}, symbar=$('.symbar'); let lastNum=null;
+  /* ---- 直接入力欄（r・t）：分数 と √ を「箱」付きの形で入力できる簡易エディタ ---- */
+  const ZW='\u200b';
+  const isEd=el=>el.tagName!=='INPUT';
+  const kid=(n,c)=>n.querySelector(':scope > .'+c);
+  function ser(n){let o='';n.childNodes.forEach(c=>{
+    if(c.nodeType===3){o+=c.nodeValue.replace(/\u200b/g,'');}
+    else if(c.classList){
+      if(c.classList.contains('fr')) o+='(('+ser(kid(c,'nu'))+')/('+ser(kid(c,'de'))+'))';
+      else if(c.classList.contains('sq')) o+='√('+ser(kid(c,'rad'))+')';
+      else o+=ser(c);}});return o;}
+  const getV=el=>isEd(el)?ser(el):el.value;
+  const setV=(el,t)=>{if(isEd(el))el.textContent=t;else el.value=t;};
+  /* 設定欄：直接入力した √・分数 は、そのままの形（箱付きの数式）で表示する */
+  const setExact=(el,x,fr,ex)=>{
+    const rootH=f=>`${f.a>1?f.a:''}<span class="sq"><span class="rt">√</span><span class="box rad">${f.n}</span></span>`;
+    let h=null;
+    if(ex){
+      if(fracOk(x,fr)) h=`<span class="fr"><span class="box nu">${fr.p}</span><span class="box de">${fr.q}</span></span>`;
+      else{const f=rootForm(x);if(f)h=f.d>1?`<span class="fr"><span class="box nu">${rootH(f)}</span><span class="box de">${f.d}</span></span>`:rootH(f);}
+    }
+    if(h===null)el.textContent=fmt(x,3);else el.innerHTML=h;
+  };
+  const refreshBoxes=el=>el.querySelectorAll('.box').forEach(b=>b.classList.toggle('empty',b.textContent.replace(/\u200b/g,'')===''));
+  const caretAt=(node,off)=>{const r=document.createRange();r.setStart(node,off);r.collapse(true);const s2=getSelection();s2.removeAllRanges();s2.addRange(r);};
+  const boxH=c=>`<span class="box ${c} empty">${ZW}</span>`;
+  function insertTpl(kind){
+    const el=lastNum; if(!el) return;
+    el.focus();
+    const sel=getSelection();
+    let r=(sel.rangeCount&&el.contains(sel.anchorNode))?sel.getRangeAt(0):null;
+    if(!r){r=document.createRange();r.selectNodeContents(el);r.collapse(false);}
+    r.deleteContents();
+    const w=document.createElement('span');w.className=kind;
+    w.innerHTML=kind==='fr'?boxH('nu')+boxH('de'):'<span class="rt">√</span>'+boxH('rad');
+    r.insertNode(document.createTextNode(ZW));r.insertNode(w);
+    caretAt(w.querySelector('.box').firstChild,1);
+    refreshBoxes(el);el.dispatchEvent(new Event('input'));
+  }
+  const KEYS=[
+    ['fr','<span class="ico-fr"><i></i><b></b><i></i></span><small>分数</small>'],
+    ['sq','<span class="ico-sq">√<i></i></span><small>ルート</small>']];
+  const pad=$('.pad');
+  KEYS.forEach(([kind,html])=>{
+    const bt=document.createElement('button');bt.type='button';bt.innerHTML=html;bt.className='pk';
+    const run=()=>insertTpl(kind);
+    bt.addEventListener('pointerdown',e=>{e.preventDefault();run();});   // 入力欄のフォーカスを外さない
+    bt.addEventListener('click',e=>{if(e.detail===0)run();});
+    pad.appendChild(bt);
+  });
+  ['theta','r','t'].forEach(k=>{const e=root.querySelector(`.row[data-k="${k}"]`);
+    rows[k]={lbl:e.querySelector('.lbl'),num:e.querySelector('.num'),rng:e.querySelector('.rng')};});
+
+  $('.chkNum').addEventListener('change',e=>{st.hideNum=e.target.checked;draw();});
+  rows.t.rng.min=0;rows.t.rng.max=1000;rows.t.rng.step=1;
+  // 角と隣辺の記号が両方設定されているときだけ頂点の記号を使う。未設定なら頂点の記号はなしで θ・r・t で表示
+  const letters=()=>{
+    if(!st.T||!st.rl) return {T:'θ',R:'',Z:'',tl:'t',rl:'r',gen:true};
+    const T=st.T,R=st.rl.toUpperCase(),Z=ORD.find(x=>x!==T&&x!==R);return {T,R,Z,tl:T.toLowerCase(),rl:st.rl,gen:false};};
+  const side=(a,b)=>[a,b].sort().join('');
+
+  function labels(){
+    const L=letters(), g=cfg.general;
+    rows.theta.lbl.textContent=`角 ${L.T}`;
+    rows.r.lbl.textContent=`辺 ${L.rl}（隣辺）`;
+    rows.t.lbl.textContent=`辺 ${L.tl}（角の対辺）`;
+  }
+  function fillR(){
+    const sel=$('.selR'); if(!sel) return;
+    const opts=['a','b','c'].filter(x=>!st.T||x!==st.T.toLowerCase());
+    if(!opts.includes(st.rl)) st.rl='';
+    sel.innerHTML=`<option value=""${st.rl===''?' selected':''}>未設定</option>`+opts.map(x=>`<option${x===st.rl?' selected':''}>${x}</option>`).join('');
+  }
+  /* 辺 t のスライダーは目盛りを不均等にして、細かく動かしたい 0〜2×r の範囲に全体の70%を割り当てる（最大値は30のまま） */
+  const T_SPLIT=700, T_END=1000;
+  const fromPos=(k,p)=>{if(k!=='t')return p;const m=2*st.r,lo=DEFS.t.min,hi=DEFS.t.max;
+    return p<=T_SPLIT?lo+(m-lo)*p/T_SPLIT:m+(hi-m)*(p-T_SPLIT)/(T_END-T_SPLIT);};
+  const toPos=(k,v)=>{if(k!=='t')return v;const m=2*st.r,lo=DEFS.t.min,hi=DEFS.t.max;
+    return v<=m?T_SPLIT*(v-lo)/(m-lo):T_SPLIT+(T_END-T_SPLIT)*(v-m)/(hi-m);};
+  const tUnitsPerPx=w=>{const m=2*st.r;return (st.t<=m?(m-DEFS.t.min)/T_SPLIT:(DEFS.t.max-m)/(T_END-T_SPLIT))*(T_END/Math.max(w,100));};
+  function sync(skipNum){
+    labels();
+    ['theta','r','t'].forEach(k=>{
+      rows[k].rng.value=toPos(k,st[k]);
+      if(k!==skipNum){if(k==='theta')setV(rows[k].num,fmt(st[k],1));else setExact(rows[k].num,st[k],st.fr[k],st.ex[k]);}
+    });
+    draw();
+  }
+
+  ['theta','r','t'].forEach(k=>{
+    const d=DEFS[k],{rng,num}=rows[k];
+    rng.addEventListener('input',()=>{
+      let v=fromPos(k,parseFloat(rng.value));
+      if(k==='t'){const h=st.r*Math.sin(st.theta*Math.PI/180);
+        const th=1.2*tUnitsPerPx(rng.clientWidth);   // 吸着はスライダー上で約1ピクセル分だけ
+        if(Math.abs(v-h)<th) v=h; else if(Math.abs(v-st.r)<th) v=st.r;}
+      st[k]=v; st.fr[k]=null; st.ex[k]=false; sync();   // スライダー操作中は小数表示
+    });
+    num.addEventListener('input',()=>{
+      if(isEd(num)) refreshBoxes(num);
+      const v=parseExpr(getV(num)); if(isNaN(v)) return;
+      if(k!=='theta') st.ex[k]=true;
+      if(k!=='theta') st.fr[k]=/[\/÷]/.test(getV(num))?ratFrac(v):null;
+      st[k]=Math.min(d.max,Math.max(d.min,v)); rng.value=toPos(k,st[k]); sync(k);
+    });
+    num.addEventListener('change',()=>sync());
+    num.addEventListener('focus',()=>{
+      if(isEd(num)){setTimeout(()=>{if(document.activeElement===num){const r=document.createRange();r.selectNodeContents(num);const q=getSelection();q.removeAllRanges();q.addRange(r);}},0);}
+      else num.select();
+      if(num.dataset.sq){symbar.hidden=false;lastNum=num;}});
+    if(isEd(num)){
+      num.addEventListener('keydown',e=>{
+        if(e.key==='Enter'){e.preventDefault();num.blur();return;}
+        const q=getSelection(), n=q.anchorNode, box=n&&(n.nodeType===3?n.parentElement:n).closest('.box');
+        if(e.key==='Backspace'&&q.isCollapsed&&box&&box.textContent.replace(/\u200b/g,'')===''){
+          e.preventDefault();const tpl=box.closest('.fr,.sq');if(tpl){tpl.remove();num.dispatchEvent(new Event('input'));}return;}
+        if((e.key==='ArrowDown'||e.key==='ArrowUp')&&box&&box.parentElement.classList.contains('fr')){
+          const tg=kid(box.parentElement,e.key==='ArrowDown'?'de':'nu');
+          if(tg&&tg!==box){e.preventDefault();caretAt(tg.lastChild||tg,(tg.lastChild&&tg.lastChild.nodeValue||'').length||0);}}
+      });
+      num.addEventListener('paste',e=>{e.preventDefault();document.execCommand('insertText',false,(e.clipboardData.getData('text')||'').replace(/\s+/g,''));});
+    }
+    num.addEventListener('blur',()=>{sync();setTimeout(()=>{const a=document.activeElement;if(!(a&&a.dataset&&a.dataset.sq&&root.contains(a)))symbar.hidden=true;},0);});
+  });
+  if(cfg.general){
+    $('.selT').value=st.T;
+    $('.selT').addEventListener('change',e=>{st.T=e.target.value;fillR();sync();});
+    $('.selR').addEventListener('change',e=>{st.rl=e.target.value;sync();});
+    fillR();
+  }
+
+  function draw(){
+    const L=letters(), {T,R,Z,tl,rl,gen}=L, S=solve(st.theta,st.r,st.t), {zx,zy,h,n}=S;
+    const W=stage.clientWidth; if(W<50) return;
+    const mobile=window.innerWidth<900;
+    const H=Math.round(mobile?Math.max(230,Math.min(W*0.8,window.innerHeight*0.42)):Math.max(260,Math.min(W*0.5,400)));
+    svg.setAttribute('width',W);svg.setAttribute('height',H);svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+
+    const lt=(nm,x,fr,ex)=>st.hideNum?[nm]:[`${nm} = `,...valT(x,fr,ex)];   // 数値なしモードでは辺の名前だけ
+    const LF=W<520?12:14;   // ラベルの文字サイズ（狭い画面では小さく）
+    const padX=Math.min(40,W*0.08),padSide=W<520?32:Math.min(90,W*0.2),padT=58,padB=64;
+    // 角の頂点（原点）は画面の決まった位置に固定。x軸は右へ伸びる
+    const ox=Math.round(W*0.4);
+    const maxX=Math.max(0,zx,...S.valid), minX=Math.min(0,zx);
+    let sc=(H-padT-padB)/Math.max(zy,1e-3);
+    sc=Math.min(sc,(W-ox-padSide)/Math.max(maxX,1e-3));
+    if(minX<0) sc=Math.min(sc,(ox-padSide)/(-minX));
+    const oy=padT+((H-padT-padB)+zy*sc)/2;
+    const X=x=>ox+x*sc, Y=y=>oy-y*sc;
+    const P=(x,y)=>X(x)+','+Y(y);
+
+    const small=S.valid[0], large=S.valid[1];
+    const col1=n===2?C_S:C_G;
+    let g='';
+    // x軸
+    g+=`<line x1="10" y1="${oy}" x2="${W-14}" y2="${oy}" stroke="#94a3b8" stroke-width="2"/>
+        <polygon points="${W-8},${oy} ${W-18},${oy-4.5} ${W-18},${oy+4.5}" fill="#94a3b8"/>
+        <text x="${W-14}" y="${oy+20}" fill="#64748b" font-size="15" text-anchor="end" font-style="italic">x</text>`
+    // y軸（原点を通って上下へ）
+    g+=`<line x1="${ox}" y1="${H-8}" x2="${ox}" y2="52" stroke="#94a3b8" stroke-width="2"/>
+        <polygon points="${ox},42 ${ox-4.5},54 ${ox+4.5},54" fill="#94a3b8"/>
+        <text x="${ox+10}" y="58" fill="#64748b" font-size="15" text-anchor="start" font-style="italic">y</text>`;
+    // 円
+    g+=`<circle cx="${X(zx)}" cy="${Y(zy)}" r="${st.t*sc}" fill="none" stroke="#f8a5bf" stroke-width="1.5" stroke-dasharray="5 5"/>`;
+    // 無効な交点（頂点の反対側）
+    S.roots.filter(o=>!o.valid).forEach(o=>{
+      g+=`<line x1="${X(zx)}" y1="${Y(zy)}" x2="${X(o.x)}" y2="${oy}" stroke="${C_N}" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <circle cx="${X(o.x)}" cy="${oy}" r="4.5" fill="#fff" stroke="${C_N}" stroke-width="2"/>`;
+    });
+    // 三角形（大きい方を背面・外側、小さい方を前面）
+    if(n===2){
+      g+=`<polygon points="${P(0,0)} ${P(zx,zy)} ${P(large,0)}" fill="${C_L}" fill-opacity=".16" stroke="${C_L}" stroke-width="5" stroke-linejoin="round"/>`;
+      g+=`<polygon points="${P(0,0)} ${P(zx,zy)} ${P(small,0)}" fill="${C_S}" fill-opacity=".22" stroke="${C_S}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    }else if(n===1){
+      g+=`<polygon points="${P(0,0)} ${P(zx,zy)} ${P(small,0)}" fill="${C_G}" fill-opacity=".2" stroke="${C_G}" stroke-width="3.5" stroke-linejoin="round"/>`;
+    }
+    // 高さ
+    // 辺 t のラベル位置（高さ h のラベルと重ならないよう先に求める）
+    const tPos=x=>{
+      const x1=X(zx),y1=Y(zy),x2=X(x),y2=oy,dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy)||1;
+      let nx=-dy/len,ny=dx/len; if(nx<0){nx=-nx;ny=-ny;}
+      const start=nx>0.4;
+      if(!start&&ny>0){nx=-nx;ny=-ny;}
+      let mx=(x1+x2)/2,my=(y1+y2)/2;const w=mathSvg(0,0,'start',LF,'#000',lt(tl,st.t,st.fr.t,st.ex.t),false).w+2;
+      let anchor=start?'start':'middle', sg=1, off=start?9:12;
+      // 高さの点線と交わる場合は、辺の左側（三角形の内側）に回す
+      if(start&&x2<X(zx)&&mx+off*nx+w>X(zx)-4){
+        // 高さの弧とぶつかる場合：辺の下寄りに右側のまま置く。それでも入らなければ内側（左）へ
+        const m2=x1+(x2-x1)*0.7, y2m=y1+(y2-y1)*0.7;
+        if(m2+off*nx+w<X(zx)-4){mx=m2;my=y2m;}
+        else{anchor='end';nx=-nx;ny=-ny;mx=m2;my=y2m;}
+      }
+      if(start&&anchor==='start'&&mx+off*nx+w>W-8){anchor='end';nx=-nx;ny=-ny;}
+      const px=mx+nx*off,py=my+ny*off+(start?4:0);
+      return {px,py,anchor,w,x0:anchor==='start'?px:anchor==='end'?px-w:px-w/2,x1:anchor==='start'?px+w:anchor==='end'?px:px+w/2,y0:py-14,y1:py+5};
+    };
+    const tBoxes=S.valid.map(tPos);
+    if(zy>1e-6&&Math.abs(zx)>1e-6){
+      const dir=zx>0?-1:1, q=Math.min(9,Math.abs(zy*sc)/2);
+      g+=`<line x1="${X(zx)}" y1="${Y(zy)}" x2="${X(zx)}" y2="${oy}" stroke="${C_H}" stroke-width="2" stroke-dasharray="3 3"/>
+          <path d="M${X(zx)+dir*q},${oy} v${-q} h${-dir*q}" fill="none" stroke="${C_H}" stroke-width="1.5"/>
+
+      ${(()=>{
+        // 高さ h のラベル（他のラベルと重ならない側を選ぶ）
+        const noSol=n===0&&st.t<h-1e-6, X0=X(zx), yT=Y(zy), pref=zx>0?1:-1;
+        const boxes=tBoxes.slice();
+        if(noSol){const lx=X0+(zx>=0?10:-10);boxes.push({x0:zx>=0?lx:lx-80,x1:zx>=0?lx+80:lx,y0:yT,y1:oy});}
+        const free=sg=>!boxes.some(b=>{const x0=sg>0?X0+2:X0-22,x1=sg>0?X0+22:X0-2;return x0<b.x1&&x1>b.x0&&yT<b.y1&&oy>b.y0;});
+        const sg=free(pref)?pref:(free(-pref)?-pref:pref);
+        const gap=(zy-st.t)*sc, ym=(noSol&&gap>=40)?(Y((zy-st.t)/2)):((yT+oy)/2);
+        const o=`<text class="halo" x="${X0+sg*9}" y="${ym+5}" fill="${C_H}" font-size="15" font-style="italic" text-anchor="${sg>0?'start':'end'}">h</text>`;
+        return o;
+      })()}
+      <circle cx="${X(zx)}" cy="${oy}" r="4.5" fill="${C_H}" stroke="#fff" stroke-width="1.5"/>
+      <text class="halo" x="${X(zx)}" y="${oy+(!gen&&(S.valid.some(v=>Math.abs(X(v)-X(zx))<22)||Math.abs(X(zx)-ox)<22)?42:24)}" fill="${C_H}" font-size="16" text-anchor="middle">H</text>`;
+    }
+    // 円が底辺に届かないとき：半径 t を太いオレンジで描き、高さの点線の上に重ねる
+    if(n===0&&st.t<h-1e-6){
+      const right=zx>=0, lx=X(zx)+(right?10:-10), an=right?'start':'end', ly=Y(zy-st.t/2);
+      g+=`<line x1="${X(zx)}" y1="${Y(zy)}" x2="${X(zx)}" y2="${Y(zy-st.t)}" stroke="${C_T}" stroke-width="3.5" stroke-linecap="round"/>
+          <circle cx="${X(zx)}" cy="${Y(zy-st.t)}" r="5.5" fill="${C_T}" stroke="#fff" stroke-width="2"/>`;
+      g+=mathSvg(lx,ly,an,LF,'#c2410c',lt(tl,st.t,st.fr.t,st.ex.t),true).g;
+    }
+    // 辺 r
+    g+=`<line x1="${P(0,0).split(',')[0]}" y1="${oy}" x2="${X(zx)}" y2="${Y(zy)}" stroke="${C_R}" stroke-width="3.5" stroke-linecap="round"/>`;
+    if(S.valid.length) g+=`<line x1="${ox}" y1="${oy}" x2="${X(S.valid[S.valid.length-1])}" y2="${oy}" stroke="${C_BASE}" stroke-width="3.5" stroke-linecap="round"/>`;
+    { const mx=X(zx/2),my=Y(zy/2),nx=-Math.sin(S.th),ny=-Math.cos(S.th);
+      g+=mathSvg(mx+nx*10,my+ny*10+4,nx<-0.4?'end':'middle',LF,'#be185d',lt(rl,st.r,st.fr.r,st.ex.r),true).g; }
+    // 辺 t（各交点）
+    S.valid.forEach((x,i)=>{
+      const c=C_T;
+      const x1=X(zx),y1=Y(zy),x2=X(x),y2=oy;
+      g+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${n===2&&i===0?3:3.5}" stroke-linecap="round"/>`;
+      const q=tBoxes[i];
+      g+=mathSvg(q.px,q.py,q.anchor,LF,'#c2410c',lt(tl,st.t,st.fr.t,st.ex.t),true).g;
+    });
+    // 角の弧
+    { const ra=Math.min(30,sc*st.r*0.4), mid=S.th/2;
+      g+=`<path d="M${ox+ra},${oy} A${ra} ${ra} 0 0 0 ${ox+ra*Math.cos(S.th)},${oy-ra*Math.sin(S.th)}" fill="none" stroke="#ec4899" stroke-width="2"/>
+          <text class="halo" x="${ox+(ra+16)*Math.cos(mid)}" y="${oy-(ra+16)*Math.sin(mid)+4}" fill="#be185d" font-size="13" text-anchor="middle">${st.hideNum?T:fmt(st.theta,st.theta%1?1:0)+'°'}</text>`; }
+    // 頂点
+    const dotc=(x,y,c)=>`<circle cx="${x}" cy="${y}" r="5.5" fill="${c}" stroke="#fff" stroke-width="2"/>`;
+    const lab=(x,y,s,c)=>`<text class="halo" x="${x}" y="${y}" fill="${c}" font-size="17" text-anchor="middle">${s}</text>`;
+    g+=dotc(ox,oy,'#0284c7')+(gen?'':lab(ox-14,oy+24,T,'#0f172a'));
+    g+=dotc(X(zx),Y(zy),C_R)+(gen?'':lab(X(zx),Y(zy)-12,Z,'#0f172a'));
+    S.valid.forEach((x,i)=>{
+      const c=n===2?(i===0?C_S:C_L):C_G, nm=n===2?R+(i===0?'₁':'₂'):R;
+      g+=dotc(X(x),oy,c)+(gen?'':lab(X(x),oy+24,nm,'#0f172a'));
+    });
+    // いま与えている3つの条件を、キャンバス上部に1行で表示（鈍角で A が左上に来ても重ならない高さを確保してある）
+    if(!st.hideNum){ const fs=W<420?13:15;
+      const tk=[{i:T},` = ${fmt(st.theta,st.theta%1?1:0)}°，`,{i:rl},' = ',...valT(st.r,st.fr.r,st.ex.r),'，',{i:tl},' = ',...valT(st.t,st.fr.t,st.ex.t)];
+      const m=mathSvg(22,28,'start',fs,'#0f172a',tk,false);
+      g+=`<rect x="10" y="8" width="${Math.ceil(m.w)+24}" height="30" rx="10" fill="#fff" fill-opacity=".95" stroke="#dbe2ec"/>`+m.g; }
+    svg.innerHTML=g;
+
+    // 個数バッジ・情報
+    // 個数の表示色：2個＝赤、1個＝緑、できない＝黄色
+    const bc=n===2?'#dc2626':n===1?C_G:'#eab308', tc=n===2?'#dc2626':n===1?C_G:'#a16207';
+    badge.style.borderColor=bc; badge.style.color=tc;
+    badge.innerHTML=`三角形の個数 <b>${n}</b> 個`;
+  }
+
+  if(typeof ResizeObserver!=='undefined') new ResizeObserver(()=>{requestAnimationFrame(draw);}).observe(stage);
+  window.addEventListener('resize',draw);
+  sync();
+  return {draw};
+}
+
+const panels={
+  t1:Panel(document.getElementById('t1'),{general:false,T:'C',rl:'b',theta:30,r:2,t:Math.SQRT2}),
+  t2:Panel(document.getElementById('t2'),{general:true,T:'',rl:'',theta:40,r:3,t:2.2})
+};
+/* タブ②はパスワード制（簡易的なロック。ファイルを開いて中身を読めば分かるので、本格的な保護ではありません） */
+const hash=str=>{let x=5381;var q=str.trim();try{q=q.normalize('NFKC');}catch(e){}for(var i=0;i<q.length;i++)x=((x<<5)+x+q.charCodeAt(i))>>>0;return x.toString(36);};
+const PW_HASH='376qjw';
+let unlocked=false;
+function showTab(b){
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x===b));
+  document.querySelectorAll('.panel').forEach(p=>p.hidden=(p.id!==b.dataset.tab));
+  panels[b.dataset.tab].draw();
+}
+const pw=document.getElementById('pw'),pwIn=document.getElementById('pwIn'),pwErr=document.getElementById('pwErr');
+let pendingBtn=null;
+const closePw=()=>{pw.hidden=true;pwIn.value='';pwErr.hidden=true;pendingBtn=null;};
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  if(b.dataset.tab==='t2'&&!unlocked){pendingBtn=b;pw.hidden=false;pwIn.value='';pwErr.hidden=true;setTimeout(()=>pwIn.focus(),0);return;}
+  showTab(b);
+}));
+const trySubmit=()=>{
+  if(hash(pwIn.value.toUpperCase())===PW_HASH){   // 大文字・小文字どちらでもOK
+    unlocked=true;const b=pendingBtn;closePw();
+    document.querySelectorAll('.tabs .lock').forEach(x=>x.remove());
+    if(b)showTab(b);
+  }else{pwErr.hidden=false;pwIn.select();}
+};
+document.getElementById('pwOk').addEventListener('click',trySubmit);
+pwIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();trySubmit();}});   // form を使わない（プレビュー枠では form 送信が禁止されることがあるため）
+document.getElementById('pwCancel').addEventListener('click',closePw);
+pw.addEventListener('click',e=>{if(e.target===pw)closePw();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!pw.hidden)closePw();});
+
+})();
+</script>
+</body>
+</html>

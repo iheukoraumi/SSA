@@ -142,6 +142,15 @@ function ratFrac(v){
   return null;
 }
 const fracOk=(x,fr)=>fr&&Math.abs(x-fr.p/fr.q)<1e-9;
+/* 特別な角（30°・45°・60° など）で高さ h が √・整数・分数で表せるときの表示トークン */
+function hExact(theta,h){
+  if([30,45,60,90,120,135,150].indexOf(theta)<0) return null;
+  const rf=rootForm(h), hi=Math.round(h), fr=ratFrac(h);
+  if(rf) return [{root:rf}];
+  if(hi>0&&Math.abs(h-hi)<1e-9) return [String(hi)];
+  if(fr) return [fr.p+'/'+fr.q];
+  return null;
+}
 /* 値の表示トークン：直接入力（ex=true）のときだけ √・分数で表示。スライダー操作中は小数 */
 const valT=(x,fr,ex)=>{
   if(!ex) return [fmt(x)];
@@ -249,9 +258,10 @@ function Panel(root,cfg){
   const ZW='\u200b';
   const isEd=el=>el.tagName!=='INPUT';
   const kid=(n,c)=>n.querySelector(':scope > .'+c);
-  function ser(n){let o='';n.childNodes.forEach(c=>{
+  function ser(n){let o='';if(!n)return o;n.childNodes.forEach(c=>{
     if(c.nodeType===3){o+=c.nodeValue.replace(/\u200b/g,'');}
     else if(c.classList){
+      if(c.classList.contains('fr')){if(!kid(c,'nu')||!kid(c,'de'))return;} if(c.classList.contains('sq')&&!kid(c,'rad'))return;
       if(c.classList.contains('fr')) o+='(('+ser(kid(c,'nu'))+')/('+ser(kid(c,'de'))+'))';
       else if(c.classList.contains('sq')) o+='√('+ser(kid(c,'rad'))+')';
       else o+=ser(c);}});return o;}
@@ -336,11 +346,11 @@ function Panel(root,cfg){
   ['theta','r','t'].forEach(k=>{
     const d=DEFS[k],{rng,num}=rows[k];
     rng.addEventListener('input',()=>{
-      let v=fromPos(k,parseFloat(rng.value));
+      let v=fromPos(k,parseFloat(rng.value)), snapH=false;
       if(k==='t'){const h=st.r*Math.sin(st.theta*Math.PI/180);
         const th=1.2*tUnitsPerPx(rng.clientWidth);   // 吸着はスライダー上で約1ピクセル分だけ
-        if(Math.abs(v-h)<th) v=h; else if(Math.abs(v-st.r)<th) v=st.r;}
-      st[k]=v; st.fr[k]=null; st.ex[k]=false; sync();   // スライダー操作中は小数表示
+        if(Math.abs(v-h)<th){v=h;snapH=true;} else if(Math.abs(v-st.r)<th) v=st.r;}
+      st[k]=v; st.fr[k]=null; st.ex[k]=snapH&&!!hExact(st.theta,v); sync();   // スライダー操作中は小数表示
     });
     num.addEventListener('input',()=>{
       if(isEd(num)) refreshBoxes(num);
@@ -441,6 +451,7 @@ function Panel(root,cfg){
       return {px,py,anchor,w,x0:anchor==='start'?px:anchor==='end'?px-w:px-w/2,x1:anchor==='start'?px+w:anchor==='end'?px:px+w/2,y0:py-14,y1:py+5};
     };
     const tBoxes=S.valid.map(tPos);
+    let hInFig=false;
     if(zy>1e-6&&Math.abs(zx)>1e-6){
       const dir=zx>0?-1:1, q=Math.min(9,Math.abs(zy*sc)/2);
       g+=`<line x1="${X(zx)}" y1="${Y(zy)}" x2="${X(zx)}" y2="${oy}" stroke="${C_H}" stroke-width="2" stroke-dasharray="3 3"/>
@@ -451,11 +462,22 @@ function Panel(root,cfg){
         const noSol=n===0&&st.t<h-1e-6, X0=X(zx), yT=Y(zy), pref=zx>0?1:-1;
         const boxes=tBoxes.slice();
         if(noSol){const lx=X0+(zx>=0?10:-10);boxes.push({x0:zx>=0?lx:lx-80,x1:zx>=0?lx+80:lx,y0:yT,y1:oy});}
+        const hx=st.hideNum?null:hExact(st.theta,h);
+        const ht=hx?[{i:'h'},' = ',...hx]:null;
+        const segs=[[ox,oy,X0,yT]].concat(S.valid.map(v=>[X(v),oy,X0,yT]));
+        const hit=(x0,x1,y0,y1)=>segs.some(q=>{for(let k=0;k<=40;k++){const px=q[0]+(q[2]-q[0])*k/40,py=q[1]+(q[3]-q[1])*k/40;if(px>x0-3&&px<x1+3&&py>y0-3&&py<y1+3)return true;}return false;});
+        const rectFree=(x0,x1,y0,y1)=>x0>6&&x1<W-6&&y1<oy-12&&!(x0<ox+75&&x1>ox-10&&y1>oy-55)&&!boxes.some(bx=>x0<bx.x1&&x1>bx.x0&&y0<bx.y1&&y1>bx.y0)&&!hit(x0,x1,y0,y1);
+        if(ht){
+          const w=mathSvg(0,0,'start',15,'#000',ht,false).w;
+          for(const f of [0.5,0.45,0.55,0.4,0.6,0.35,0.65,0.3,0.7,0.25,0.75,0.2,0.8,0.15,0.85,0.1,0.9])for(const sg of [pref,-pref]){
+            const ymc=oy+(yT-oy)*f, x0=sg>0?X0+8:X0-8-w, x1=sg>0?X0+8+w:X0-8;
+            if(rectFree(x0,x1,ymc-14,ymc+5)){hInFig=true;return mathSvg(X0+sg*9,ymc+5,sg>0?'start':'end',15,C_H,ht,true).g;}
+          }
+        }
         const free=sg=>!boxes.some(b=>{const x0=sg>0?X0+2:X0-22,x1=sg>0?X0+22:X0-2;return x0<b.x1&&x1>b.x0&&yT<b.y1&&oy>b.y0;});
         const sg=free(pref)?pref:(free(-pref)?-pref:pref);
         const gap=(zy-st.t)*sc, ym=(noSol&&gap>=40)?(Y((zy-st.t)/2)):((yT+oy)/2);
-        const o=`<text class="halo" x="${X0+sg*9}" y="${ym+5}" fill="${C_H}" font-size="15" font-style="italic" text-anchor="${sg>0?'start':'end'}">h</text>`;
-        return o;
+        return `<text class="halo" x="${X0+sg*9}" y="${ym+5}" fill="${C_H}" font-size="15" font-style="italic" text-anchor="${sg>0?'start':'end'}">h</text>`;
       })()}
       <circle cx="${X(zx)}" cy="${oy}" r="4.5" fill="${C_H}" stroke="#fff" stroke-width="1.5"/>
       <text class="halo" x="${X(zx)}" y="${oy+(!gen&&(S.valid.some(v=>Math.abs(X(v)-X(zx))<22)||Math.abs(X(zx)-ox)<22)?42:24)}" fill="${C_H}" font-size="16" text-anchor="middle">H</text>`;
@@ -496,6 +518,7 @@ function Panel(root,cfg){
     // いま与えている3つの条件を、キャンバス上部に1行で表示（鈍角で A が左上に来ても重ならない高さを確保してある）
     if(!st.hideNum){ const fs=W<420?13:15;
       const tk=[{i:T},` = ${fmt(st.theta,st.theta%1?1:0)}°，`,{i:rl},' = ',...valT(st.r,st.fr.r,st.ex.r),'，',{i:tl},' = ',...valT(st.t,st.fr.t,st.ex.t)];
+      { const hx2=hExact(st.theta,h); if(hx2&&!hInFig&&zy>1e-6&&Math.abs(zx)>1e-6) tk.push('，',{i:'h'},' = ',...hx2); }
       const m=mathSvg(22,28,'start',fs,'#0f172a',tk,false);
       g+=`<rect x="10" y="8" width="${Math.ceil(m.w)+24}" height="30" rx="10" fill="#fff" fill-opacity=".95" stroke="#dbe2ec"/>`+m.g; }
     svg.innerHTML=g;
